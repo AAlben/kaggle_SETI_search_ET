@@ -106,10 +106,8 @@ def mixup_criterion(criterion, pred, y_a, y_b, lam):
 
 
 def train(epoch, model, train_loader, optimizer, loss_fn, lr_scheduler):
-    total_train = 0
-    correct_train = 0
-    loss_train = 0.0
-    losses_train = []
+    losses_train, accuracy_train = [], []
+    Y, y_pred = [], []
 
     model.train()
     for i, data in enumerate(train_loader):
@@ -128,22 +126,19 @@ def train(epoch, model, train_loader, optimizer, loss_fn, lr_scheduler):
         loss.backward()
         optimizer.step()
 
-        accuracy = torch.sum(torch.abs(labels - outputs)) / images.shape[0]
-        loss_train += loss.item()
         losses_train.append(loss.item())
+        Y.extend(labels.detach().cpu().numpy().tolist())
+        y_pred.extend(outputs.detach().cpu().numpy().tolist())
 
         if (i + 1) % PRINT_INTERVAL == 0:
-            loss_mean = loss_train / PRINT_INTERVAL
-            logger.info(f'Train - Epoch = {epoch:3}; Iteration = {i:3}; Len = {len(train_loader):3}; Loss = {loss_mean:8.4}; Acc = {accuracy:8.4}; Interval = {time.time() - s_t:8.4}')
-            loss_mean = 0
+            logger.info(f'Train - Epoch = {epoch:3}; Iteration = {i:3}; Len = {len(train_loader):3}; Loss = {np.mean(losses_train):8.4}; Acc = {metrics.roc_auc_score(Y, y_pred):8.4}; Interval = {time.time() - s_t:8.4}')
     lr_scheduler.step()
-    return losses_train, accuracy
+    return losses_train, metrics.roc_auc_score(Y, y_pred)
 
 
 def valid(epoch, model, valide_loader):
-    total_valid = 0
-    correct_valid = 0
-    losses_valid = []
+    losses_valid, accuracy_valid = [], []
+    Y, y_pred = [], []
 
     model.eval()
     with torch.no_grad():
@@ -159,11 +154,12 @@ def valid(epoch, model, valide_loader):
             outputs = model(images).squeeze(1)
             outputs_avg = outputs.view(batch_n, crops_n).mean(1)
             loss = loss_fn(outputs_avg, labels)
-            accuracy = torch.sum(torch.abs(labels - outputs_avg)) / images.shape[0]
 
             losses_valid.append(loss.item())
-        logger.info(f'Valid - Epoch = {epoch:3}; Iteration = {i:3}; Len = {len(valide_loader):3}; Loss = {np.mean(losses_valid):8.4}; Acc = {accuracy:8.4}; Interval = {time.time() - s_t:8.4}')
-    return losses_valid, accuracy
+            Y.extend(labels.detach().cpu().numpy().tolist())
+            y_pred.extend(outputs_avg.detach().cpu().numpy().tolist())
+        logger.info(f'Valid - Epoch = {epoch:3}; Iteration = {i:3}; Len = {len(valide_loader):3}; Loss = {np.mean(losses_valid):8.4}; Acc = {metrics.roc_auc_score(Y, y_pred):8.4}; Interval = {time.time() - s_t:8.4}')
+    return losses_valid, metrics.roc_auc_score(Y, y_pred)
 
 
 def test(epoch, model, test_loader, writer):
@@ -182,7 +178,6 @@ def test(epoch, model, test_loader, writer):
             outputs_avg = outputs.view(batch_n, crops_n).mean(1)
 
             if flag == 0:
-                pdb.set_trace()
                 grid_images = grid_images.contiguous().view(-1, 1, grid_images.shape[-2], grid_images.shape[-1])
                 grid = torchvision.utils.make_grid(grid_images, nrow=6)
                 writer.add_image(f'test_{epoch}_{i}', grid)
@@ -209,7 +204,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     ver = args.ver
     comment = args.comment
-    logger.info(f'{"*" * 25} {comment} {"*" * 25}')
+    logger.info(f'{"*" * 25} version = {ver}; comment = {comment} {"*" * 25}')
 
     EPOCH = 4
     BATCH_SIZE = 10
@@ -258,6 +253,8 @@ if __name__ == '__main__':
         losses_valid, acc_valid = valid(epoch, model, valid_loader)
         writer.add_scalars(f'loss_{ver}', {'train': np.mean(losses_train),
                                            'valid': np.mean(losses_valid)}, epoch)
+        writer.add_scalars(f'accuracy_{ver}', {'train': acc_train,
+                                               'valid': acc_valid}, epoch)
         test(epoch, model, test_loader, writer)
         torch.save(model.state_dict(), f'{MODEL_SAVE_PATH}/vggnet_cat_dog_0525_{epoch}.pth')
         logger.info(f'Summary - Epoch = {epoch:3}; loss_train = {np.mean(losses_train):8.4}; loss_valid = {np.mean(losses_valid):8.4}; acc_train = {acc_train:8.4}; acc_valid = {acc_valid:8.4}')
