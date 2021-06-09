@@ -21,10 +21,17 @@ class SnippetsDataset(Dataset):
     def __getitem__(self, index):
         file, label = self.files[index], self.labels[index]
         data = np.load(file).astype(float)  # before - dtype('float16'); after - dtype('float64')
-        data = data / np.array([np.abs(data).max() for i in range(6)]).reshape(6, 1, 1)
+        # data = np.array([np.concatenate(data[:2]), np.concatenate(data[2:4]), np.concatenate(data[4:])])
+        data = data / np.abs(data).max()
 
         if self.transform:
             data = self.transform(data)
+
+        if self.mode == 1:
+            label = np.repeat(label, 10)
+        elif self.mode == 0:
+            label = np.array([label])
+
         return data, label
 
     def __len__(self):
@@ -33,12 +40,14 @@ class SnippetsDataset(Dataset):
     def load(self, labels_csv_file):
         df = pd.read_csv(labels_csv_file)
         df['file'] = df['id'].apply(lambda x: os.path.join(self.data_path, x[0], f'{x}.npy'))
-        if self.mode == 'train':
-            df = df.sample(frac=self.train_valid_rate, random_state=self.seed)
-        elif self.mode == 'valid':
-            df = df.sample(frac=1 - self.train_valid_rate, random_state=self.seed)
+
+        if self.mode == 0:
+            df = df[df.target == 0]
+        elif self.mode == 1:
+            df = df[df.target == 1]
         else:
             raise Exception('', '')
+
         return df.file.tolist(), df.target.tolist()
 
 
@@ -53,7 +62,8 @@ class SnippetsDatasetTest(Dataset):
     def __getitem__(self, index):
         file = self.files[index]
         data = np.load(file).astype(float)
-        data = data / np.array([np.abs(data).max() for i in range(6)]).reshape(6, 1, 1)
+        # data = np.array([np.concatenate(data[:2]), np.concatenate(data[2:4]), np.concatenate(data[4:])])
+        data = data / np.abs(data).max()
         if self.transform:
             data = self.transform(data)
         return data
@@ -72,3 +82,17 @@ class SnippetsDatasetTest(Dataset):
             files.append(os.path.join(folder_path, folder_files[0]))
             files.append(os.path.join(folder_path, random_file))
         return files
+
+
+class SimpleCustomBatch(object):
+
+    def __init__(self, data):
+        images, labels = list(zip(*data))
+        self.labels = torch.from_numpy(np.concatenate(labels))
+        self.images = torch.cat(images)
+
+    # custom memory pinning method on custom type
+    def pin_memory(self):
+        self.images = self.images.pin_memory()
+        self.labels = self.labels.pin_memory()
+        return self.images, self.labels
