@@ -132,3 +132,5 @@ dmypy.json
 board/
 log/
 model_state/
+submissions/
+*.pth

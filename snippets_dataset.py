@@ -27,12 +27,7 @@ class SnippetsDataset(Dataset):
         if self.transform:
             data = self.transform(data)
 
-        if self.mode == 1:
-            label = np.repeat(label, 10)
-        elif self.mode == 0:
-            label = np.array([label])
-
-        return data, label
+        return data, np.array([label])
 
     def __len__(self):
         return len(self.files)
@@ -53,9 +48,10 @@ class SnippetsDataset(Dataset):
 
 class SnippetsDatasetTest(Dataset):
 
-    def __init__(self, data_path, transform=None, seed=123):
+    def __init__(self, data_path, mode, transform=None, seed=123):
         random.seed(seed)
         self.data_path = data_path
+        self.mode = mode
         self.transform = transform
         self.files = self.load()
 
@@ -66,7 +62,7 @@ class SnippetsDatasetTest(Dataset):
         data = data / np.abs(data).max()
         if self.transform:
             data = self.transform(data)
-        return data
+        return data, file
 
     def __len__(self):
         return len(self.files)
@@ -78,9 +74,14 @@ class SnippetsDatasetTest(Dataset):
                 continue
             folder_path = os.path.join(self.data_path, folder)
             folder_files = os.listdir(folder_path)
-            random_file = random.choice(folder_files)
-            files.append(os.path.join(folder_path, folder_files[0]))
-            files.append(os.path.join(folder_path, random_file))
+            if self.mode == 'test':
+                random_file = random.choice(folder_files)
+                files.append(os.path.join(folder_path, folder_files[0]))
+                files.append(os.path.join(folder_path, random_file))
+            elif self.mode == 'inference':
+                files.extend([os.path.join(folder_path, file) for file in folder_files])
+            else:
+                raise Exception('', '')
         return files
 
 

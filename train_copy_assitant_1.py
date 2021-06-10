@@ -168,7 +168,7 @@ def test(epoch, model, test_loader, writer):
     model.eval()
     with torch.no_grad():
         for i, data in enumerate(test_loader):
-            images = data
+            images, files = data
             images = images.type(torch.FloatTensor)
             images = images.to(device)
 
@@ -225,13 +225,13 @@ if __name__ == '__main__':
     LABELS_CSV = '/home/alben/data/cv_listen_2021_06/train_labels.csv'
     BOARD_PATH = '/home/alben/code/kaggle_SETI_search_ET/board/train'
     MODEL_SAVE_PATH = '/home/alben/code/kaggle_SETI_search_ET/model_state'
-    LR = 0.001
+    LR = 0.005
     LR_DECAY_STEP = 6
     NUM_CLASSES = 1
-    baseline_name = 'efficientnet-b3'
+    baseline_name = 'efficientnet-b0'
     normalize_mean, normalize_std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
     IMG_H_W = (273, 256)
-    TRAIN_VALID_RATE = 0.6
+    TRAIN_VALID_RATE = 0.9
 
     writer = SummaryWriter(log_dir=BOARD_PATH, flush_secs=60)
 
@@ -240,7 +240,7 @@ if __name__ == '__main__':
     label_0_train = random.sample(label_0_ids, int(len(label_0_data) * TRAIN_VALID_RATE))
     label_0_valid = list(set(label_0_ids) - set(label_0_train))
 
-    label_1_data = SnippetsDataset(TRAIN_DATA_PATH, LABELS_CSV, 1, transforms_1)
+    label_1_data = SnippetsDataset(TRAIN_DATA_PATH, LABELS_CSV, 1, transforms_0)
     label_1_ids = range(len(label_1_data))
     label_1_train = random.sample(label_1_ids, int(len(label_1_data) * TRAIN_VALID_RATE))
     label_1_valid = list(set(label_1_ids) - set(label_1_train))
@@ -259,7 +259,7 @@ if __name__ == '__main__':
                               collate_fn=collate_wrapper,
                               pin_memory=True)
 
-    test_data = SnippetsDatasetTest(TEST_DATA_PATH, transforms_1)
+    test_data = SnippetsDatasetTest(TEST_DATA_PATH, 'test', transforms_1)
     test_loader = DataLoader(dataset=test_data,
                              batch_size=len(test_data))
 
@@ -281,6 +281,6 @@ if __name__ == '__main__':
         writer.add_scalars(f'accuracy_{ver}', {'train': acc_train,
                                                'valid': acc_valid}, epoch)
         test(epoch, model, test_loader, writer)
-        torch.save(model.state_dict(), f'{MODEL_SAVE_PATH}/vggnet_cat_dog_0525_{epoch}.pth')
+        torch.save(model.state_dict(), f'{MODEL_SAVE_PATH}/efficientnet_SETI_0609_{epoch}.pth')
         logger.info(f'Summary - Epoch = {epoch:3}; loss_train = {np.mean(losses_train):8.4}; loss_valid = {np.mean(losses_valid):8.4}; acc_train = {np.mean(acc_train):8.4}; acc_valid = {np.mean(acc_valid):8.4}')
     writer.close()
