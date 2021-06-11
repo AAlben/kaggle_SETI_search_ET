@@ -105,7 +105,7 @@ def mixup_data(x, y, alpha=1.0, use_cuda=True):
 
 
 def mixup_criterion(criterion, pred, y_a, y_b, lam):
-    return lam * criterion(pred, y_a.view(-1, 1)) + (1 - lam) * criterion(pred, y_b.view(-1, 1))
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
 
 def train(epoch, model, train_loader, optimizer, loss_fn, lr_scheduler):
@@ -122,9 +122,11 @@ def train(epoch, model, train_loader, optimizer, loss_fn, lr_scheduler):
         # images = images.view(-1, C, H, W)
         # labels = labels.repeat_interleave(crops_n)
 
-        outputs = model(images).squeeze(1)
+        minxed_images, labels, choice_label, lambda_ = mixup_data(images, labels, alpha=0.4)
+        outputs = model(minxed_images).squeeze(1)
         optimizer.zero_grad()
-        loss = loss_fn(outputs, labels)
+        # loss = loss_fn(outputs, labels)
+        loss = mixup_criterion(loss_fn, outputs, labels, choice_label, lambda_)
         loss.backward()
         optimizer.step()
 
@@ -194,8 +196,8 @@ def transforms_1(data):
 
 def transforms_0(data):
     data = torch.from_numpy(data)
-    data = transforms.RandomCrop(224)(data)
-    return data.unsqueeze(0)
+    data = transforms.Resize(256)(data)
+    return data
 
 
 def collate_wrapper(batch):
@@ -218,20 +220,20 @@ if __name__ == '__main__':
     logger.info(f'{"*" * 25} version = {ver}; comment = {comment} {"*" * 25}')
 
     EPOCH = 30
-    BATCH_SIZE = 25
+    BATCH_SIZE = 50
     PRINT_INTERVAL = 1000
     TRAIN_DATA_PATH = '/home/alben/data/cv_listen_2021_06/train'
     TEST_DATA_PATH = '/home/alben/data/cv_listen_2021_06/test'
     LABELS_CSV = '/home/alben/data/cv_listen_2021_06/train_labels.csv'
     BOARD_PATH = '/home/alben/code/kaggle_SETI_search_ET/board/train'
     MODEL_SAVE_PATH = '/home/alben/code/kaggle_SETI_search_ET/model_state'
-    LR = 0.005
-    LR_DECAY_STEP = 6
+    LR = 0.01
+    LR_DECAY_STEP = 5
     NUM_CLASSES = 1
-    baseline_name = 'efficientnet-b0'
+    baseline_name = 'efficientnet-b2'
     normalize_mean, normalize_std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
     IMG_H_W = (273, 256)
-    TRAIN_VALID_RATE = 0.9
+    TRAIN_VALID_RATE = 0.95
 
     writer = SummaryWriter(log_dir=BOARD_PATH, flush_secs=60)
 
@@ -248,25 +250,21 @@ if __name__ == '__main__':
     train_data = ConcatDataset([Subset(label_0_data, label_0_train), Subset(label_1_data, label_1_train)])
     train_loader = DataLoader(dataset=train_data,
                               batch_size=BATCH_SIZE,
-                              shuffle=True,
-                              collate_fn=collate_wrapper,
-                              pin_memory=True)
+                              shuffle=True)
 
     valid_data = ConcatDataset([Subset(label_0_data, label_0_valid), Subset(label_1_data, label_1_valid)])
     valid_loader = DataLoader(dataset=valid_data,
                               batch_size=BATCH_SIZE,
-                              shuffle=True,
-                              collate_fn=collate_wrapper,
-                              pin_memory=True)
+                              shuffle=True)
 
     test_data = SnippetsDatasetTest(TEST_DATA_PATH, 'test', transforms_1)
     test_loader = DataLoader(dataset=test_data,
                              batch_size=len(test_data))
 
-    # model = EfficientNet.from_pretrained(baseline_name)
-    # fc_in_feature = model._fc.in_features
-    # model._fc = nn.Linear(fc_in_feature, NUM_CLASSES, bias=True)
-    model = EfficientNetV2(baseline_name, NUM_CLASSES)
+    model = EfficientNet.from_pretrained(baseline_name)
+    fc_in_feature = model._fc.in_features
+    model._fc = nn.Linear(fc_in_feature, NUM_CLASSES, bias=True)
+    # model = EfficientNetV2(baseline_name, NUM_CLASSES)
     model.to(device)
 
     loss_fn = nn.BCEWithLogitsLoss()
@@ -280,6 +278,7 @@ if __name__ == '__main__':
                                            'valid': np.mean(losses_valid)}, epoch)
         writer.add_scalars(f'accuracy_{ver}', {'train': acc_train,
                                                'valid': acc_valid}, epoch)
+        writer.add_scalar(f'lr_{ver}',  lr_scheduler.get_last_lr()[0], epoch)
         test(epoch, model, test_loader, writer)
         torch.save(model.state_dict(), f'{MODEL_SAVE_PATH}/efficientnet_SETI_0609_{epoch}.pth')
         logger.info(f'Summary - Epoch = {epoch:3}; loss_train = {np.mean(losses_train):8.4}; loss_valid = {np.mean(losses_valid):8.4}; acc_train = {np.mean(acc_train):8.4}; acc_valid = {np.mean(acc_valid):8.4}')

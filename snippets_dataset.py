@@ -21,13 +21,13 @@ class SnippetsDataset(Dataset):
     def __getitem__(self, index):
         file, label = self.files[index], self.labels[index]
         data = np.load(file).astype(float)  # before - dtype('float16'); after - dtype('float64')
-        # data = np.array([np.concatenate(data[:2]), np.concatenate(data[2:4]), np.concatenate(data[4:])])
+        data = np.array([np.concatenate(data[:2]), np.concatenate(data[2:4]), np.concatenate(data[4:])])
         data = data / np.abs(data).max()
 
         if self.transform:
             data = self.transform(data)
 
-        return data, np.array([label])
+        return data, label
 
     def __len__(self):
         return len(self.files)
@@ -58,7 +58,7 @@ class SnippetsDatasetTest(Dataset):
     def __getitem__(self, index):
         file = self.files[index]
         data = np.load(file).astype(float)
-        # data = np.array([np.concatenate(data[:2]), np.concatenate(data[2:4]), np.concatenate(data[4:])])
+        data = np.array([np.concatenate(data[:2]), np.concatenate(data[2:4]), np.concatenate(data[4:])])
         data = data / np.abs(data).max()
         if self.transform:
             data = self.transform(data)

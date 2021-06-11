@@ -94,12 +94,12 @@ if __name__ == '__main__':
     BATCH_SIZE = 25
     TEST_DATA_PATH = '/home/alben/data/cv_listen_2021_06/test'
     MODEL_SAVE_PATH = '/home/alben/code/kaggle_SETI_search_ET'
-    MODEL_FILE = 'vggnet_cat_dog_0525_3.pth'
+    MODEL_FILE = 'efficientnet_SETI_0609_4.pth'
     SUBMISSION_PATH = '/home/alben/code/kaggle_SETI_search_ET/submissions'
     LR = 0.005
     LR_DECAY_STEP = 6
     NUM_CLASSES = 1
-    baseline_name = 'efficientnet-b0'
+    baseline_name = 'efficientnet-b2'
     normalize_mean, normalize_std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
     IMG_H_W = (273, 256)
     TRAIN_VALID_RATE = 0.9
@@ -109,7 +109,12 @@ if __name__ == '__main__':
                              batch_size=BATCH_SIZE)
 
     model_path = os.path.join(MODEL_SAVE_PATH, MODEL_FILE)
-    model = EfficientNetV2(baseline_name, NUM_CLASSES)
+    # model = EfficientNetV2(baseline_name, NUM_CLASSES)
+    # model.load_state_dict(torch.load(model_path))
+    # model.to(device)
+    model = EfficientNet.from_pretrained(baseline_name)
+    fc_in_feature = model._fc.in_features
+    model._fc = nn.Linear(fc_in_feature, NUM_CLASSES, bias=True)
     model.load_state_dict(torch.load(model_path))
     model.to(device)
 
