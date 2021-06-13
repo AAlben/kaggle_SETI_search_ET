@@ -134,3 +134,4 @@ log/
 model_state/
 assistant/
 submissions/
+*.pth
