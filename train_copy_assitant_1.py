@@ -181,7 +181,7 @@ def test(epoch, model, test_loader, writer):
             # outputs_avg = outputs.view(batch_n, crops_n).mean(1)
 
             grid_images = images
-            outputs_avg = model(images)
+            outputs_avg = model(images).squeeze(1)
 
             if flag == 0:
                 grid_images = grid_images.contiguous().view(-1, 1, grid_images.shape[-2], grid_images.shape[-1])
