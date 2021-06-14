@@ -48,7 +48,7 @@ from plotly.subplots import make_subplots
 # from skimage.io import imshow, imread, imsave
 # from skimage.transform import rotate, AffineTransform, warp, rescale, resize, downscale_local_mean
 
-from snippets_dataset import SnippetsDataset, SnippetsDatasetTest, SimpleCustomBatch
+from snippets_dataset import SnippetsDataset, SnippetsDatasetTest
 
 
 logger.add('/home/alben/code/kaggle_SETI_search_ET/log/train.log', rotation="1 day")
@@ -125,7 +125,7 @@ def train(epoch, model, train_loader, optimizer, loss_fn, lr_scheduler):
             outputs = model(minxed_images).squeeze(1)
             loss = mixup_criterion(loss_fn, outputs, labels, choice_label, lambda_)
         else:
-            outputs = model(images)
+            outputs = model(images).squeeze(1)
             loss = loss_fn(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -223,7 +223,7 @@ if __name__ == '__main__':
     logger.info(f'{"*" * 25} version = {ver}; comment = {comment} {"*" * 25}')
 
     EPOCH = 30
-    BATCH_SIZE = 50
+    BATCH_SIZE = 25
     PRINT_INTERVAL = 1000
     TRAIN_DATA_PATH = '/home/alben/data/cv_listen_2021_06/train'
     TEST_DATA_PATH = '/home/alben/data/cv_listen_2021_06/test'
@@ -233,7 +233,7 @@ if __name__ == '__main__':
     # LR = 0.01
     # LR_DECAY_STEP = 5
     NUM_CLASSES = 1
-    baseline_name = 'efficientnet-b2'
+    baseline_name = 'efficientnet-b0'
     # normalize_mean, normalize_std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
     # IMG_H_W = (273, 256)
     TRAIN_VALID_RATE = 0.8
@@ -264,22 +264,22 @@ if __name__ == '__main__':
     test_loader = DataLoader(dataset=test_data,
                              batch_size=len(test_data))
 
-    model = EfficientNet.from_pretrained(baseline_name)
-    fc_in_feature = model._fc.in_features
-    model._fc = nn.Linear(fc_in_feature, NUM_CLASSES, bias=True)
-    # model = EfficientNetV2(baseline_name, NUM_CLASSES)
+    # model = EfficientNet.from_pretrained(baseline_name)
+    # fc_in_feature = model._fc.in_features
+    # model._fc = nn.Linear(fc_in_feature, NUM_CLASSES, bias=True)
+    model = EfficientNetV2(baseline_name, NUM_CLASSES)
     model.to(device)
 
     loss_fn = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters())
-    scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer,
-                                                  base_lr=0.001,
-                                                  max_lr=5e-4,
-                                                  gamma=0.9,
-                                                  cycle_momentum=False,
-                                                  step_size_up=1400,
-                                                  step_size_down=1400,
-                                                  mode="triangular2")
+    lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer,
+                                                     base_lr=0.001,
+                                                     max_lr=5e-4,
+                                                     gamma=0.9,
+                                                     cycle_momentum=False,
+                                                     step_size_up=1400,
+                                                     step_size_down=1400,
+                                                     mode="triangular2")
 
     for epoch in tqdm(range(EPOCH)):
         losses_train, acc_train = train(epoch, model, train_loader, optimizer, loss_fn, lr_scheduler)
